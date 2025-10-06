@@ -32,6 +32,7 @@ jobs:
 
       - uses: anthropics/claude-code-action@v1
         with:
+          github_token: ${{ steps.app-token.outputs.token }}
           use_bedrock: "true"
           prompt: |
             REPO: ${{ github.repository }}
