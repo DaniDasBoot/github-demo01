@@ -148,6 +148,7 @@ jobs:
           echo "${{ steps.parse-status.outputs.claude_response }}"
 
       - name: Evaluate Security Threshold
+        # This following will force this step to always run, even if a previous step fails.
         if: always()
         env:
           SECURITY_STATUS: ${{ steps.parse-status.outputs.security_status }}
