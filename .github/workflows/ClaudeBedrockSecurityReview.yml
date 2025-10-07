@@ -83,31 +83,42 @@ jobs:
       - name: Parse Security Status
         id: parse-status
         run: |
-          # Extract the SECURITY_STATUS line from Claude's response
-          RESPONSE="${{ steps.security-review.outputs.response }}"
+          # Get Claude's response from the execution file
+          EXECUTION_FILE="${{ steps.security-review.outputs.execution_file }}"
 
-          # Debug: Check if response is empty and show available outputs
+          # Debug: Check available outputs and execution file
           echo "=== Claude Action Outputs Debug ==="
+          echo "Execution file: $EXECUTION_FILE"
+          echo "Branch name: ${{ steps.security-review.outputs.branch_name }}"
+          echo "GitHub token set: ${{ steps.security-review.outputs.github_token != '' }}"
+
+          if [ -z "$EXECUTION_FILE" ]; then
+            echo "::error::No execution file output from Claude action"
+            echo "security_status=UNKNOWN" >> $GITHUB_OUTPUT
+            echo "claude_response=No execution file from Claude action" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          if [ ! -f "$EXECUTION_FILE" ]; then
+            echo "::error::Execution file does not exist: $EXECUTION_FILE"
+            echo "security_status=UNKNOWN" >> $GITHUB_OUTPUT
+            echo "claude_response=Execution file not found: $EXECUTION_FILE" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Read Claude's response from the execution file
+          RESPONSE=$(cat "$EXECUTION_FILE")
           echo "Response length: ${#RESPONSE}"
+
           if [ -z "$RESPONSE" ]; then
-            echo "::warning::Claude response is empty!"
-            echo "Available step outputs:"
-            echo "- response: '${{ steps.security-review.outputs.response }}'"
-            echo "- error: '${{ steps.security-review.outputs.error }}'"
-            echo "- success: '${{ steps.security-review.outputs.success }}'"
-            echo "- exit_code: '${{ steps.security-review.outputs.exit_code }}'"
+            echo "::error::Execution file is empty"
+            echo "security_status=UNKNOWN" >> $GITHUB_OUTPUT
+            echo "claude_response=Empty execution file" >> $GITHUB_OUTPUT
+            exit 1
           else
             echo "Response preview (first 200 chars): ${RESPONSE:0:200}..."
           fi
           echo "================================="
-
-          # Handle empty response case
-          if [ -z "$RESPONSE" ]; then
-            echo "::error::Claude action did not produce any response. Check the action logs above."
-            echo "security_status=UNKNOWN" >> $GITHUB_OUTPUT
-            echo "claude_response=No response from Claude action" >> $GITHUB_OUTPUT
-            exit 1
-          fi
 
           # Look for the SECURITY_STATUS line (case insensitive)
           SECURITY_LINE=$(echo "$RESPONSE" | grep -i "SECURITY_STATUS:" | tail -1)
