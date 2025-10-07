@@ -148,6 +148,7 @@ jobs:
           echo "${{ steps.parse-status.outputs.claude_response }}"
 
       - name: Evaluate Security Threshold
+        if: always()
         env:
           SECURITY_STATUS: ${{ steps.parse-status.outputs.security_status }}
           # Configure which security levels should fail the workflow
