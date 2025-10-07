@@ -80,8 +80,8 @@ jobs:
       
       - name: Block merge on security issues
         if: >
-          contains(steps.security-review.outputs.response, 'SECURITY_STATUS: CRITICAL') ||
-          contains(steps.security-review.outputs.response, 'SECURITY_STATUS: HIGH')
+          contains(steps.security-review.outputs.response, 'CRITICAL') ||
+          contains(steps.security-review.outputs.response, 'HIGH')
         run: |
           echo "::error::PR blocked due to CRITICAL or HIGH security issues found in review"
           exit 1
