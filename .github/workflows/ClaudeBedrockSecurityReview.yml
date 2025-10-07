@@ -75,11 +75,12 @@ jobs:
             Rate severity as: CRITICAL, HIGH, MEDIUM, LOW, or NONE.
             Post detailed findings with recommendations.
 
-            At the end of your response, you must include a line indicating the security status of the analysis: "SECURITY_STATUS: [CRITICAL|HIGH|MEDIUM|LOW|NONE]"
+            At the end of your response, you must include a line indicating the security status of the analysis: Include the exact string "SECURITY_STATUS:" followed by one of the options in this list [CRITICAL|HIGH|MEDIUM|LOW|NONE]
             
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*)" |
             --model "us.anthropic.claude-sonnet-4-20250514-v1:0"
+      
       - name: Block merge on security issues
         if: >
           contains(steps.security-review.outputs.response, 'SECURITY_STATUS: CRITICAL') ||
