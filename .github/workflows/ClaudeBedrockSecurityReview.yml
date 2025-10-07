@@ -78,6 +78,11 @@ jobs:
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*)"
       
+      - name: Debug Claude response
+        run: |
+          echo "Claude Response:"
+          echo "${{ steps.security-review.outputs.response }}"
+      
       - name: Block merge on security issues
         if: >
           contains(steps.security-review.outputs.response, 'CRITICAL') ||
