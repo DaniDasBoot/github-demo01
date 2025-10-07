@@ -70,8 +70,7 @@ jobs:
             
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*)" |
-            --model "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-      
+            --model "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
       - name: Block merge on security issues
         if: >
           contains(steps.security-review.outputs.response, 'SECURITY_STATUS: CRITICAL') ||
