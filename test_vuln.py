@@ -1,10 +1,12 @@
 # test_vuln.py - clearly marked test file
-#import pickle
-#import base64
+import pickle
+import base64
 
 # INTENTIONAL TEST VULNERABILITY - DO NOT USE IN PRODUCTION
-#def load_user_data(data):
-#    return pickle.loads(base64.b64decode(data))
+def load_user_data(data):
+    return pickle.loads(base64.b64decode(data))
+
+'''
 
 import json
 import base64
@@ -17,3 +19,4 @@ def load_user_data(data):
         return parsed
     except (ValueError, json.JSONDecodeError) as e:
         raise ValueError(f"Invalid data format: {e}")
+'''
