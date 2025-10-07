@@ -74,19 +74,143 @@ jobs:
 
             Rate SECURITY_STATUS as: CRITICAL, HIGH, MEDIUM, LOW, or NONE.
             Post detailed findings with recommendations.
-                       
+
+            At the end of your response, you must include a line which indicates the security status of the analysis: "SECURITY_STATUS: [CRITICAL|HIGH|MEDIUM|LOW|NONE]"
+            
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*)"
       
-      - name: Debug Claude response
+      - name: Parse Security Status
+        id: parse-status
         run: |
-          echo "Claude Response:"
-          echo "${{ steps.security-review.outputs.response }}"
-      
-      - name: Block merge on security issues
-        if: >
-          contains(steps.security-review.outputs.response, 'CRITICAL') ||
-          contains(steps.security-review.outputs.response, 'HIGH')
+          # Extract the SECURITY_STATUS line from Claude's response
+          RESPONSE="${{ steps.security-review.outputs.response }}"
+
+          # Debug: Check if response is empty and show available outputs
+          echo "=== Claude Action Outputs Debug ==="
+          echo "Response length: ${#RESPONSE}"
+          if [ -z "$RESPONSE" ]; then
+            echo "::warning::Claude response is empty!"
+            echo "Available step outputs:"
+            echo "- response: '${{ steps.security-review.outputs.response }}'"
+            echo "- error: '${{ steps.security-review.outputs.error }}'"
+            echo "- success: '${{ steps.security-review.outputs.success }}'"
+            echo "- exit_code: '${{ steps.security-review.outputs.exit_code }}'"
+          else
+            echo "Response preview (first 200 chars): ${RESPONSE:0:200}..."
+          fi
+          echo "================================="
+
+          # Handle empty response case
+          if [ -z "$RESPONSE" ]; then
+            echo "::error::Claude action did not produce any response. Check the action logs above."
+            echo "security_status=UNKNOWN" >> $GITHUB_OUTPUT
+            echo "claude_response=No response from Claude action" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Look for the SECURITY_STATUS line (case insensitive)
+          SECURITY_LINE=$(echo "$RESPONSE" | grep -i "SECURITY_STATUS:" | tail -1)
+
+          if [ -z "$SECURITY_LINE" ]; then
+            echo "::warning::No SECURITY_STATUS found in Claude response, treating as MEDIUM risk"
+            echo "security_status=MEDIUM" >> $GITHUB_OUTPUT
+          else
+            # Extract the status level (CRITICAL, HIGH, MEDIUM, LOW, NONE)
+            STATUS=$(echo "$SECURITY_LINE" | sed -n 's/.*SECURITY_STATUS:[[:space:]]*\([A-Z_]*\).*/\1/p')
+            echo "Found security status: $STATUS"
+            echo "security_status=$STATUS" >> $GITHUB_OUTPUT
+          fi
+
+          # Also output the full response for debugging
+          echo "claude_response<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESPONSE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Debug Security Analysis
         run: |
-          echo "::error::PR blocked due to CRITICAL or HIGH security issues found in review"
-          exit 1
+          echo "Parsed Security Status: ${{ steps.parse-status.outputs.security_status }}"
+          echo ""
+          echo "Full Claude Response:"
+          echo "${{ steps.parse-status.outputs.claude_response }}"
+
+      - name: Evaluate Security Threshold
+        env:
+          SECURITY_STATUS: ${{ steps.parse-status.outputs.security_status }}
+          # Configure which security levels should fail the workflow
+          # You can customize these in your repository variables
+          REPO_FAIL_ON_CRITICAL: ${{ vars.FAIL_ON_CRITICAL }}
+          REPO_FAIL_ON_HIGH: ${{ vars.FAIL_ON_HIGH }}
+          REPO_FAIL_ON_MEDIUM: ${{ vars.FAIL_ON_MEDIUM }}
+          REPO_FAIL_ON_LOW: ${{ vars.FAIL_ON_LOW }}
+        run: |
+          # Set defaults for configuration variables
+          FAIL_ON_CRITICAL="${REPO_FAIL_ON_CRITICAL:-true}"
+          FAIL_ON_HIGH="${REPO_FAIL_ON_HIGH:-true}"
+          FAIL_ON_MEDIUM="${REPO_FAIL_ON_MEDIUM:-false}"
+          FAIL_ON_LOW="${REPO_FAIL_ON_LOW:-false}"
+
+          echo "Security Status: $SECURITY_STATUS"
+          echo "Threshold Configuration:"
+          echo "  FAIL_ON_CRITICAL: $FAIL_ON_CRITICAL"
+          echo "  FAIL_ON_HIGH: $FAIL_ON_HIGH"
+          echo "  FAIL_ON_MEDIUM: $FAIL_ON_MEDIUM"
+          echo "  FAIL_ON_LOW: $FAIL_ON_LOW"
+
+          # Convert to uppercase for comparison
+          STATUS_UPPER=$(echo "$SECURITY_STATUS" | tr '[:lower:]' '[:upper:]')
+
+          SHOULD_FAIL=false
+
+          case "$STATUS_UPPER" in
+            "CRITICAL")
+              if [ "$FAIL_ON_CRITICAL" = "true" ]; then
+                SHOULD_FAIL=true
+                echo "::error::PR blocked due to CRITICAL security issues"
+              else
+                echo "::notice::CRITICAL security issues found, but configured to allow merge"
+              fi
+              ;;
+            "HIGH")
+              if [ "$FAIL_ON_HIGH" = "true" ]; then
+                SHOULD_FAIL=true
+                echo "::error::PR blocked due to HIGH security issues"
+              else
+                echo "::notice::HIGH security issues found, but configured to allow merge"
+              fi
+              ;;
+            "MEDIUM")
+              if [ "$FAIL_ON_MEDIUM" = "true" ]; then
+                SHOULD_FAIL=true
+                echo "::error::PR blocked due to MEDIUM security issues"
+              else
+                echo "::notice::MEDIUM security issues found, but configured to allow merge"
+              fi
+              ;;
+            "LOW")
+              if [ "$FAIL_ON_LOW" = "true" ]; then
+                SHOULD_FAIL=true
+                echo "::error::PR blocked due to LOW security issues"
+              else
+                echo "::notice::LOW security issues found, but configured to allow merge"
+              fi
+              ;;
+            "NONE")
+              echo "::notice::No security issues found - PR approved"
+              ;;
+            "UNKNOWN")
+              echo "::error::Could not determine security status due to Claude action failure"
+              SHOULD_FAIL=true
+              ;;
+            *)
+              echo "::warning::Unknown security status '$STATUS_UPPER', treating as failure for safety"
+              SHOULD_FAIL=true
+              ;;
+          esac
+
+          if [ "$SHOULD_FAIL" = "true" ]; then
+            echo "Security review failed - check the detailed analysis above"
+            exit 1
+          else
+            echo "Security review passed"
+          fi
