@@ -33,6 +33,7 @@ jobs:
           aws-region: us-west-2
 
       - name: Invoke Bedrock
+        id: security-review
         uses: anthropics/claude-code-action@v1
         with:
           github_token: ${{ steps.app-token.outputs.token }}
@@ -72,7 +73,9 @@ jobs:
             --model "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
       
       - name: Block merge on security issues
-        if: contains(steps.security-review.outputs.response, 'SECURITY_STATUS: CRITICAL') || contains(steps.security-review.outputs.response, 'SECURITY_STATUS: HIGH')
+        if: >
+          contains(steps.security-review.outputs.response, 'SECURITY_STATUS: CRITICAL') ||
+          contains(steps.security-review.outputs.response, 'SECURITY_STATUS: HIGH')
         run: |
           echo "::error::PR blocked due to CRITICAL or HIGH security issues found in review"
           exit 1
