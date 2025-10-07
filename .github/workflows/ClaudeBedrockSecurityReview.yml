@@ -139,6 +139,8 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Debug Security Analysis
+        # This following line disables the step; set to 'true' to enable
+        if: false 
         run: |
           echo "Parsed Security Status: ${{ steps.parse-status.outputs.security_status }}"
           echo ""
