@@ -1,3 +1,4 @@
+'''
 # test_vuln.py - clearly marked test file
 import pickle
 import base64
@@ -7,3 +8,4 @@ def load_user_data(data):
     return pickle.loads(base64.b64decode(data))
 
 #Update to file 5
+'''
